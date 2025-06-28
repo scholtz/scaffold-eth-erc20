@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { NextPage } from "next";
-import { formatEther, parseEther } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { useAccount } from "wagmi";
 import { AddressInput, InputBase } from "~~/components/scaffold-eth";
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
@@ -22,6 +22,11 @@ const ERC20: NextPage = () => {
   const { data: totalSupply } = useScaffoldReadContract({
     contractName: "BiatecToken",
     functionName: "totalSupply",
+  });
+
+  const { data: decimals } = useScaffoldReadContract({
+    contractName: "BiatecToken",
+    functionName: "decimals",
   });
 
   const { writeContractAsync: writeBiatecTokenAsync } = useScaffoldWriteContract("BiatecToken");
@@ -81,18 +86,21 @@ const ERC20: NextPage = () => {
         <div className="flex flex-col justify-center items-center bg-base-300 w-full mt-8 px-8 pt-6 pb-12">
           <div className="flex justify-center items-center space-x-2 flex-col sm:flex-row">
             <p className="my-2 mr-2 font-bold text-2xl">Total Supply:</p>
-            <p className="text-xl">{totalSupply ? formatEther(totalSupply) : 0} tokens</p>
+            <p className="text-xl">{totalSupply && decimals ? formatUnits(totalSupply, decimals) : 0} tokens</p>
           </div>
           <div className="flex justify-center items-center space-x-2 flex-col sm:flex-row">
             <p className="y-2 mr-2 font-bold text-2xl">Your Balance:</p>
-            <p className="text-xl">{balance ? formatEther(balance) : 0} tokens</p>
+            <p className="text-xl">{balance && decimals ? formatUnits(balance, decimals) : 0} tokens</p>
           </div>
           <div className="flex justify-center items-center space-x-2 flex-col sm:flex-row mb-6">
             <button
               className="btn btn-accent text-lg px-12 mt-2"
               onClick={async () => {
                 try {
-                  await writeBiatecTokenAsync({ functionName: "mint", args: [connectedAddress, parseEther("100")] });
+                  await writeBiatecTokenAsync({
+                    functionName: "mint",
+                    args: [connectedAddress, decimals ? parseUnits("100", decimals) : parseUnits("100", 6)],
+                  });
                 } catch (e) {
                   console.error("Error while minting token", e);
                 }
@@ -117,8 +125,8 @@ const ERC20: NextPage = () => {
                     disabled={!balance}
                     className="btn btn-secondary text-xs h-6 min-h-6"
                     onClick={() => {
-                      if (balance) {
-                        setAmount(formatEther(balance));
+                      if (balance && decimals) {
+                        setAmount(formatUnits(balance, decimals));
                       }
                     }}
                   >
@@ -136,7 +144,10 @@ const ERC20: NextPage = () => {
                 disabled={!toAddress || !amount}
                 onClick={async () => {
                   try {
-                    await writeBiatecTokenAsync({ functionName: "transfer", args: [toAddress, parseEther(amount)] });
+                    await writeBiatecTokenAsync({
+                      functionName: "transfer",
+                      args: [toAddress, decimals ? parseUnits(amount, decimals) : parseUnits(amount, 6)],
+                    });
                     setToAddress("");
                     setAmount("");
                   } catch (e) {

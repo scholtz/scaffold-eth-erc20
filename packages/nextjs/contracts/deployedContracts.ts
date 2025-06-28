@@ -7,7 +7,7 @@ import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 const deployedContracts = {
   31337: {
     BiatecToken: {
-      address: "0xbe18A1B61ceaF59aEB6A9bC81AB4FB87D56Ba167",
+      address: "0x09120eAED8e4cD86D85a616680151DAA653880F2",
       abi: [
         {
           inputs: [

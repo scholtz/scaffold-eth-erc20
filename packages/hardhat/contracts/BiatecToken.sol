@@ -16,11 +16,13 @@ contract BiatecToken is ERC20, Pausable, Ownable {
 
     constructor(string memory name, string memory symbol, uint8 decimals_, address minter_, uint256 premint) ERC20(name, symbol) Ownable(msg.sender) {
         _decimals = decimals_;
-        minter = minter_;
+        
+        // If minter is zero address, set owner as minter
+        minter = (minter_ == address(0)) ? msg.sender : minter_;
         
         // Premint tokens to the minter address if premint > 0
         if (premint > 0) {
-            _mint(minter_, premint);
+            _mint(minter, premint);
         }
     }
 

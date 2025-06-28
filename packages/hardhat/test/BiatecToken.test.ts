@@ -59,6 +59,25 @@ describe("BiatecToken", function () {
     it("Should not be paused initially", async function () {
       expect(await biatecToken.paused()).to.equal(false);
     });
+
+    it("Should set owner as minter when zero address is provided", async function () {
+      const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
+      const premintAmount = ethers.parseUnits("500000", 6); // 500,000 tokens with 6 decimals
+      const zeroAddress = "0x0000000000000000000000000000000000000000";
+
+      const tokenWithOwnerMinter = await BiatecTokenFactory.deploy(
+        "Owner Minter Token",
+        "OMT",
+        6,
+        zeroAddress,
+        premintAmount,
+      );
+      await tokenWithOwnerMinter.waitForDeployment();
+
+      expect(await tokenWithOwnerMinter.minter()).to.equal(owner.address);
+      expect(await tokenWithOwnerMinter.owner()).to.equal(owner.address);
+      expect(await tokenWithOwnerMinter.balanceOf(owner.address)).to.equal(premintAmount);
+    });
   });
 
   describe("Minting", function () {
