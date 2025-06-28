@@ -9,7 +9,8 @@ async function main() {
 
   // Deploy the contract
   const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
-  const biatecToken = await BiatecTokenFactory.deploy("Biatec Token", "BIAT", 18, minter.address);
+  const premintAmount = ethers.parseUnits("5000000", 18); // 5 million tokens with 18 decimals
+  const biatecToken = await BiatecTokenFactory.deploy("Biatec Token", "BIAT", 18, minter.address, premintAmount);
   await biatecToken.waitForDeployment();
 
   console.log("BiatecToken deployed to:", await biatecToken.getAddress());
@@ -18,6 +19,8 @@ async function main() {
   console.log("\n=== Initial State ===");
   console.log("Current owner:", await biatecToken.owner());
   console.log("Current minter:", await biatecToken.minter());
+  console.log("Preminted amount:", ethers.formatUnits(await biatecToken.balanceOf(minter.address), 18), "BIAT");
+  console.log("Total supply:", ethers.formatUnits(await biatecToken.totalSupply(), 18), "BIAT");
 
   // Transfer ownership
   console.log("\n=== Transferring Ownership ===");

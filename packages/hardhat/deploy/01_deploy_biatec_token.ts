@@ -21,9 +21,12 @@ const deployBiatecToken: DeployFunction = async function (hre: HardhatRuntimeEnv
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
+  // Premint 1,000,000 tokens (with 6 decimals = 1,000,000 * 10^6)
+  const premintAmount = "1000000000000"; // 1,000,000 tokens with 6 decimals
+
   await deploy("BiatecToken", {
     from: deployer,
-    args: ["Token Test", "Test", 6, deployer],
+    args: ["Token Test", "Test", 6, deployer, premintAmount],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.

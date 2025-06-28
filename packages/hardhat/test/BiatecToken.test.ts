@@ -11,7 +11,8 @@ describe("BiatecToken", function () {
     [owner, addr1, addr2] = await ethers.getSigners();
 
     const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
-    biatecToken = await BiatecTokenFactory.deploy("Token Test", "Test", 6, owner.address);
+    const premintAmount = ethers.parseUnits("1000000", 6); // 1,000,000 tokens with 6 decimals
+    biatecToken = await BiatecTokenFactory.deploy("Token Test", "Test", 6, owner.address, premintAmount);
     await biatecToken.waitForDeployment();
   });
 
@@ -29,7 +30,22 @@ describe("BiatecToken", function () {
     });
 
     it("Should have zero total supply initially", async function () {
-      expect(await biatecToken.totalSupply()).to.equal(0);
+      expect(await biatecToken.totalSupply()).to.equal(ethers.parseUnits("1000000", 6));
+    });
+
+    it("Should premint tokens to minter address", async function () {
+      const expectedPremint = ethers.parseUnits("1000000", 6);
+      expect(await biatecToken.balanceOf(owner.address)).to.equal(expectedPremint);
+      expect(await biatecToken.totalSupply()).to.equal(expectedPremint);
+    });
+
+    it("Should work with zero premint", async function () {
+      const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
+      const zeroPremintToken = await BiatecTokenFactory.deploy("Zero Token", "ZERO", 6, owner.address, 0);
+      await zeroPremintToken.waitForDeployment();
+
+      expect(await zeroPremintToken.totalSupply()).to.equal(0);
+      expect(await zeroPremintToken.balanceOf(owner.address)).to.equal(0);
     });
 
     it("Should set the right minter", async function () {
@@ -48,11 +64,13 @@ describe("BiatecToken", function () {
   describe("Minting", function () {
     it("Should mint tokens to specified address when called by minter", async function () {
       const mintAmount = ethers.parseUnits("100", 6); // 100 tokens with 6 decimals
+      const premintAmount = ethers.parseUnits("1000000", 6); // Initial premint amount
+      const expectedTotalSupply = premintAmount + mintAmount;
 
       await biatecToken.mint(addr1.address, mintAmount);
 
       expect(await biatecToken.balanceOf(addr1.address)).to.equal(mintAmount);
-      expect(await biatecToken.totalSupply()).to.equal(mintAmount);
+      expect(await biatecToken.totalSupply()).to.equal(expectedTotalSupply);
     });
 
     it("Should revert when non-minter tries to mint tokens", async function () {
