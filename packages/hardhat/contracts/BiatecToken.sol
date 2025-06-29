@@ -7,22 +7,23 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract BiatecToken is ERC20, Pausable, Ownable {
     uint8 private _decimals;
-    address public minter;
+    mapping(address => bool) public minters;
 
     modifier onlyMinter() {
-        require(msg.sender == minter, "Only minter can perform this action");
+        require(minters[msg.sender], "Only minter can perform this action");
         _;
     }
 
-    constructor(string memory name, string memory symbol, uint8 decimals_, address minter_, uint256 premint) ERC20(name, symbol) Ownable(msg.sender) {
+    modifier onlyMinterOrOwner() {
+        require(minters[msg.sender] || msg.sender == owner(), "Only minter or owner can perform this action");
+        _;
+    }
+
+    constructor(string memory name, string memory symbol, uint8 decimals_, uint256 premint) ERC20(name, symbol) Ownable(msg.sender) {
         _decimals = decimals_;
-        
-        // If minter is zero address, set owner as minter
-        minter = (minter_ == address(0)) ? msg.sender : minter_;
-        
-        // Premint tokens to the minter address if premint > 0
+        minters[msg.sender] = true; // Owner is minter by default
         if (premint > 0) {
-            _mint(minter, premint);
+            _mint(msg.sender, premint);
         }
     }
 
@@ -30,8 +31,8 @@ contract BiatecToken is ERC20, Pausable, Ownable {
         return _decimals;
     }
 
-    // Minting is restricted to the minter only.
-    function mint(address to, uint256 amount) public onlyMinter {
+    // Minting is restricted to minters or owner only.
+    function mint(address to, uint256 amount) public onlyMinterOrOwner {
         _mint(to, amount);
     }
 
@@ -56,16 +57,42 @@ contract BiatecToken is ERC20, Pausable, Ownable {
         _unpause();
     }
 
-    // Change the minter address (only owner)
-    function setMinter(address newMinter) public onlyOwner {
+    // Add a new minter (only owner)
+    function addMinter(address newMinter) public onlyOwner {
         require(newMinter != address(0), "Minter cannot be zero address");
-        address oldMinter = minter;
-        minter = newMinter;
-        emit MinterChanged(oldMinter, newMinter);
+        require(!minters[newMinter], "Already a minter");
+        minters[newMinter] = true;
+        emit MinterAdded(newMinter);
     }
 
-    // Event to track minter changes
-    event MinterChanged(address indexed oldMinter, address indexed newMinter);
+    // Remove a minter (only owner)
+    function removeMinter(address minterToRemove) public onlyOwner {
+        require(minters[minterToRemove], "Not a minter");
+        minters[minterToRemove] = false;
+        emit MinterRemoved(minterToRemove);
+    }
+
+    // List all minters (view function)
+    function listMinters(address[] calldata possibleMinters) public view returns (address[] memory) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < possibleMinters.length; i++) {
+            if (minters[possibleMinters[i]]) {
+                count++;
+            }
+        }
+        address[] memory result = new address[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < possibleMinters.length; i++) {
+            if (minters[possibleMinters[i]]) {
+                result[idx] = possibleMinters[i];
+                idx++;
+            }
+        }
+        return result;
+    }
+
+    event MinterAdded(address indexed newMinter);
+    event MinterRemoved(address indexed removedMinter);
 
     // Override _update to include pausable functionality
     function _update(address from, address to, uint256 value) internal override whenNotPaused {

@@ -12,7 +12,7 @@ describe("BiatecToken", function () {
 
     const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
     const premintAmount = ethers.parseUnits("1000000", 6); // 1,000,000 tokens with 6 decimals
-    biatecToken = await BiatecTokenFactory.deploy("Token Test", "Test", 6, owner.address, premintAmount);
+    biatecToken = await BiatecTokenFactory.deploy("Token Test", "Test", 6, premintAmount);
     await biatecToken.waitForDeployment();
   });
 
@@ -41,15 +41,16 @@ describe("BiatecToken", function () {
 
     it("Should work with zero premint", async function () {
       const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
-      const zeroPremintToken = await BiatecTokenFactory.deploy("Zero Token", "ZERO", 6, owner.address, 0);
+      const zeroPremintToken = await BiatecTokenFactory.deploy("Zero Token", "ZERO", 6, 0);
       await zeroPremintToken.waitForDeployment();
 
       expect(await zeroPremintToken.totalSupply()).to.equal(0);
       expect(await zeroPremintToken.balanceOf(owner.address)).to.equal(0);
     });
 
-    it("Should set the right minter", async function () {
-      expect(await biatecToken.minter()).to.equal(owner.address);
+    it("Should set the right minters (owner by default)", async function () {
+      expect(await biatecToken.minters(owner.address)).to.equal(true);
+      expect(await biatecToken.minters(addr1.address)).to.equal(false);
     });
 
     it("Should set the right owner", async function () {
@@ -60,23 +61,15 @@ describe("BiatecToken", function () {
       expect(await biatecToken.paused()).to.equal(false);
     });
 
-    it("Should set owner as minter when zero address is provided", async function () {
+    it("Should set owner as minter by default", async function () {
       const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
-      const premintAmount = ethers.parseUnits("500000", 6); // 500,000 tokens with 6 decimals
-      const zeroAddress = "0x0000000000000000000000000000000000000000";
 
-      const tokenWithOwnerMinter = await BiatecTokenFactory.deploy(
-        "Owner Minter Token",
-        "OMT",
-        6,
-        zeroAddress,
-        premintAmount,
-      );
+      const tokenWithOwnerMinter = await BiatecTokenFactory.deploy("Owner Minter Token", "OMT", 6, 0);
       await tokenWithOwnerMinter.waitForDeployment();
 
-      expect(await tokenWithOwnerMinter.minter()).to.equal(owner.address);
+      expect(await tokenWithOwnerMinter.minters(owner.address)).to.equal(true);
       expect(await tokenWithOwnerMinter.owner()).to.equal(owner.address);
-      expect(await tokenWithOwnerMinter.balanceOf(owner.address)).to.equal(premintAmount);
+      expect(await tokenWithOwnerMinter.balanceOf(owner.address)).to.equal(0);
     });
   });
 
@@ -97,7 +90,7 @@ describe("BiatecToken", function () {
 
       // Try to mint from a different account (non-minter)
       await expect(biatecToken.connect(addr1).mint(addr2.address, mintAmount)).to.be.revertedWith(
-        "Only minter can perform this action",
+        "Only minter or owner can perform this action",
       );
     });
   });
@@ -236,53 +229,44 @@ describe("BiatecToken", function () {
   });
 
   describe("Minter Management", function () {
-    it("Should allow owner to change minter", async function () {
-      expect(await biatecToken.minter()).to.equal(owner.address);
+    it("Should allow owner to add and remove minters", async function () {
+      // Add addr1 as minter
+      await expect(biatecToken.addMinter(addr1.address)).to.emit(biatecToken, "MinterAdded").withArgs(addr1.address);
+      expect(await biatecToken.minters(addr1.address)).to.equal(true);
 
-      await biatecToken.setMinter(addr1.address);
-
-      expect(await biatecToken.minter()).to.equal(addr1.address);
+      // Remove addr1 as minter
+      await expect(biatecToken.removeMinter(addr1.address))
+        .to.emit(biatecToken, "MinterRemoved")
+        .withArgs(addr1.address);
+      expect(await biatecToken.minters(addr1.address)).to.equal(false);
     });
 
-    it("Should emit MinterChanged event when minter is changed", async function () {
-      await expect(biatecToken.setMinter(addr1.address))
-        .to.emit(biatecToken, "MinterChanged")
-        .withArgs(owner.address, addr1.address);
-    });
-
-    it("Should revert when non-owner tries to change minter", async function () {
-      await expect(biatecToken.connect(addr1).setMinter(addr2.address)).to.be.revertedWithCustomError(
-        biatecToken,
-        "OwnableUnauthorizedAccount",
-      );
-    });
-
-    it("Should revert when trying to set minter to zero address", async function () {
-      await expect(biatecToken.setMinter(ethers.ZeroAddress)).to.be.revertedWith("Minter cannot be zero address");
-    });
-
-    it("Should allow new minter to mint tokens", async function () {
+    it("Should allow any minter or owner to mint", async function () {
       const mintAmount = ethers.parseUnits("100", 6);
-
-      // Change minter to addr1
-      await biatecToken.setMinter(addr1.address);
-
-      // New minter should be able to mint
+      // Add addr1 as minter
+      await biatecToken.addMinter(addr1.address);
+      // addr1 can mint
       await biatecToken.connect(addr1).mint(addr2.address, mintAmount);
-
       expect(await biatecToken.balanceOf(addr2.address)).to.equal(mintAmount);
+      // owner can mint
+      await biatecToken.mint(addr2.address, mintAmount);
+      expect(await biatecToken.balanceOf(addr2.address)).to.equal(mintAmount * 2n);
     });
 
-    it("Should prevent old minter from minting after minter change", async function () {
-      const mintAmount = ethers.parseUnits("100", 6);
-
-      // Change minter to addr1
-      await biatecToken.setMinter(addr1.address);
-
-      // Old minter (owner) should not be able to mint anymore
-      await expect(biatecToken.mint(addr2.address, mintAmount)).to.be.revertedWith(
-        "Only minter can perform this action",
+    it("Should revert when non-minter/non-owner tries to mint", async function () {
+      const mintAmount = ethers.parseUnits("50", 6);
+      await expect(biatecToken.connect(addr2).mint(addr1.address, mintAmount)).to.be.revertedWith(
+        "Only minter or owner can perform this action",
       );
+    });
+
+    it("Should list all whitelisted minters", async function () {
+      // Add addr1 and addr2 as minters
+      await biatecToken.addMinter(addr1.address);
+      await biatecToken.addMinter(addr2.address);
+      // List minters
+      const minters = await biatecToken.listMinters([owner.address, addr1.address, addr2.address]);
+      expect(minters).to.include.members([owner.address, addr1.address, addr2.address]);
     });
   });
 
@@ -324,9 +308,9 @@ describe("BiatecToken", function () {
       await biatecToken.connect(addr1).pause();
       expect(await biatecToken.paused()).to.equal(true);
 
-      // New owner should be able to change minter
-      await biatecToken.connect(addr1).setMinter(addr2.address);
-      expect(await biatecToken.minter()).to.equal(addr2.address);
+      // New owner should be able to add minters
+      await biatecToken.connect(addr1).addMinter(addr2.address);
+      expect(await biatecToken.minters(addr2.address)).to.equal(true);
     });
 
     it("Should prevent old owner from performing owner functions after transfer", async function () {
@@ -336,8 +320,8 @@ describe("BiatecToken", function () {
       // Old owner should not be able to pause anymore
       await expect(biatecToken.pause()).to.be.revertedWithCustomError(biatecToken, "OwnableUnauthorizedAccount");
 
-      // Old owner should not be able to change minter anymore
-      await expect(biatecToken.setMinter(addr2.address)).to.be.revertedWithCustomError(
+      // Old owner should not be able to add minters anymore
+      await expect(biatecToken.addMinter(addr2.address)).to.be.revertedWithCustomError(
         biatecToken,
         "OwnableUnauthorizedAccount",
       );
@@ -370,8 +354,8 @@ describe("BiatecToken", function () {
         "OwnableUnauthorizedAccount",
       );
 
-      // Nobody should be able to change minter anymore
-      await expect(biatecToken.setMinter(addr1.address)).to.be.revertedWithCustomError(
+      // Nobody should be able to add minters anymore
+      await expect(biatecToken.addMinter(addr1.address)).to.be.revertedWithCustomError(
         biatecToken,
         "OwnableUnauthorizedAccount",
       );

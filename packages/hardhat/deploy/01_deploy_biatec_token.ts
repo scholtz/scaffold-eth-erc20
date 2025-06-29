@@ -24,12 +24,9 @@ const deployBiatecToken: DeployFunction = async function (hre: HardhatRuntimeEnv
   // Premint 1,000,000 tokens (with 6 decimals = 1,000,000 * 10^6)
   const premintAmount = "1000000000000"; // 1,000,000 tokens with 6 decimals
 
-  // Use zero address to make the deployer (owner) the minter
-  const minterAddress = "0x0000000000000000000000000000000000000000";
-
   await deploy("BiatecToken", {
     from: deployer,
-    args: ["Token Test", "Test", 6, minterAddress, premintAmount],
+    args: ["Token Test", "Test", 6, premintAmount],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
