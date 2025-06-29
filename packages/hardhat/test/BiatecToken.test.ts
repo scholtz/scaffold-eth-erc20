@@ -12,7 +12,7 @@ describe("BiatecToken", function () {
 
     const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
     const premintAmount = ethers.parseUnits("1000000", 6); // 1,000,000 tokens with 6 decimals
-    biatecToken = await BiatecTokenFactory.deploy("Token Test", "Test", 6, premintAmount);
+    biatecToken = await BiatecTokenFactory.deploy("Token Test", "Test", 6, premintAmount, owner.address);
     await biatecToken.waitForDeployment();
   });
 
@@ -41,7 +41,7 @@ describe("BiatecToken", function () {
 
     it("Should work with zero premint", async function () {
       const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
-      const zeroPremintToken = await BiatecTokenFactory.deploy("Zero Token", "ZERO", 6, 0);
+      const zeroPremintToken = await BiatecTokenFactory.deploy("Zero Token", "ZERO", 6, 0, owner.address);
       await zeroPremintToken.waitForDeployment();
 
       expect(await zeroPremintToken.totalSupply()).to.equal(0);
@@ -64,12 +64,47 @@ describe("BiatecToken", function () {
     it("Should set owner as minter by default", async function () {
       const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
 
-      const tokenWithOwnerMinter = await BiatecTokenFactory.deploy("Owner Minter Token", "OMT", 6, 0);
+      const tokenWithOwnerMinter = await BiatecTokenFactory.deploy("Owner Minter Token", "OMT", 6, 0, owner.address);
       await tokenWithOwnerMinter.waitForDeployment();
 
       expect(await tokenWithOwnerMinter.minters(owner.address)).to.equal(true);
       expect(await tokenWithOwnerMinter.owner()).to.equal(owner.address);
       expect(await tokenWithOwnerMinter.balanceOf(owner.address)).to.equal(0);
+    });
+
+    it("Should mint initial supply to specified receiver", async function () {
+      const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
+      const initialSupply = ethers.parseUnits("500000", 6); // 500,000 tokens with 6 decimals
+
+      const tokenWithCustomReceiver = await BiatecTokenFactory.deploy(
+        "Custom Receiver Token",
+        "CRT",
+        6,
+        initialSupply,
+        addr1.address,
+      );
+      await tokenWithCustomReceiver.waitForDeployment();
+
+      expect(await tokenWithCustomReceiver.balanceOf(addr1.address)).to.equal(initialSupply);
+      expect(await tokenWithCustomReceiver.balanceOf(owner.address)).to.equal(0);
+      expect(await tokenWithCustomReceiver.totalSupply()).to.equal(initialSupply);
+    });
+
+    it("Should mint initial supply to owner when receiver is zero address", async function () {
+      const BiatecTokenFactory = await ethers.getContractFactory("BiatecToken");
+      const initialSupply = ethers.parseUnits("300000", 6); // 300,000 tokens with 6 decimals
+
+      const tokenWithZeroReceiver = await BiatecTokenFactory.deploy(
+        "Zero Receiver Token",
+        "ZRT",
+        6,
+        initialSupply,
+        ethers.ZeroAddress,
+      );
+      await tokenWithZeroReceiver.waitForDeployment();
+
+      expect(await tokenWithZeroReceiver.balanceOf(owner.address)).to.equal(initialSupply);
+      expect(await tokenWithZeroReceiver.totalSupply()).to.equal(initialSupply);
     });
   });
 
